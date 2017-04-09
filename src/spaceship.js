@@ -10,20 +10,34 @@
     var HERO_COLOR = '#ff0000';
     var ENEMY_FREQ = 1500;
     var ENEMIES_COLOR = '#00ff00';
+    var PLAYER_FIRING_SPEED = 200;
+    var HERO_SHOOTING_SPEED = 15;
+    var SHOOT_COLOR = '#ffff00';
 
-    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ,ENEMIES_COLOR);
+    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED,SHOOT_COLOR);
 
-    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ,ENEMIES_COLOR) {
+    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED,SHOOT_COLOR) {
         var canvas = document.createElement('canvas');
         var ctx = canvas.getContext("2d");
         attachCanvas(canvas, ctx);
-        var StarStream = getStarStream(canvas, ctx, SPEED, STAR_NUMBER, MAX_STAR_SIZE)
-        var SpaceShip = getPlayerSpaceship(canvas.height - HERO_Y, canvas);
+        var StarStream = getStarStream(canvas, ctx, SPEED, STAR_NUMBER, MAX_STAR_SIZE);
+        var SpaceShipStream = getPlayerSpaceship(canvas.height - HERO_Y, canvas);
         var EnemiesStream = getEnemiesStream(ENEMY_FREQ, canvas);
+        var PlayerFiringStream = getPlayerFiringStream(PLAYER_FIRING_SPEED,canvas);
+        var HeroShotsStream = getHeroShots(PlayerFiringStream, SpaceShipStream,canvas.height - HERO_Y);
 
         var Game = Rx.Observable.combineLatest(
-            StarStream, SpaceShip, EnemiesStream, function (stars, spaceship, enemies) {
-                return { stars: stars, spaceship: spaceship, enemies: enemies };
+            StarStream,
+            SpaceShipStream,
+            EnemiesStream,
+            HeroShotsStream,
+            function (stars, spaceship, enemies, heroShots) {
+                return {
+                    stars: stars,
+                    spaceship: spaceship,
+                    enemies: enemies,
+                    heroShots: heroShots
+                };
             })
             .sample(SPEED);
         Game.subscribe(renderScene);
@@ -31,8 +45,39 @@
         function renderScene(actors) {
             paintStars(actors.stars, canvas, ctx, SPACE_COLOR, STARS_COLOR);
             paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
-            paintEnemies(actors.enemies,ctx,ENEMIES_COLOR);
+            paintEnemies(actors.enemies, ctx, ENEMIES_COLOR);
+            paintHeroShots(actors.heroShots,ctx,HERO_SHOOTING_SPEED,SHOOT_COLOR);
         }
+    }
+
+    function paintHeroShots(heroShots, ctx,HERO_SHOOTING_SPEED,SHOOT_COLOR) {
+        heroShots.forEach(function (shot) {
+            shot.y -= HERO_SHOOTING_SPEED;
+            drawTriangle(ctx, shot.x, shot.y, 5, SHOOT_COLOR, 'up');
+        });
+    }
+
+    function getHeroShots(PlayerFiringStream, SpaceShipStream, HERO_Y) {
+        return Rx.Observable.combineLatest(
+            PlayerFiringStream,
+            SpaceShipStream,
+            function (shotEvents, spaceShip) {
+                return {
+                    timestamp: shotEvents.timestamp,
+                    x: spaceShip.x
+                };
+            })
+            .distinctUntilChanged(function (shot) { return shot.timestamp; })
+            .scan(function (shotArray, shot) {
+                shotArray.push({ x: shot.x, y: HERO_Y });
+                return shotArray;
+            }, []);
+    }
+
+    function getPlayerFiringStream(PLAYER_FIRING_SPEED,canvas) {
+        return Rx.Observable.fromEvent(canvas, 'click')
+            .sample(PLAYER_FIRING_SPEED)
+            .timestamp();
     }
 
     function getEnemiesStream(ENEMY_FREQ, canvas) {
@@ -47,7 +92,7 @@
             }, []);
     }
 
-    function paintEnemies(enemies,ctx, ENEMIES_COLOR) {
+    function paintEnemies(enemies, ctx, ENEMIES_COLOR) {
         enemies.forEach(function (enemy) {
             enemy.y += 5;
             enemy.x += getRandomInt(-15, 15);
@@ -112,8 +157,7 @@
     }
 
     function getPlayerSpaceship(HERO_Y, canvas) {
-        var mouseMove = Rx.Observable.fromEvent(canvas, 'mousemove');
-        var observable = mouseMove
+        var mouseMove = Rx.Observable.fromEvent(canvas, 'mousemove')
             .map(function (event) {
                 return {
                     x: event.clientX,
@@ -124,7 +168,7 @@
                 x: canvas.width / 2,
                 y: HERO_Y
             });
-        return observable;
+        return mouseMove;
     }
 
 })();
