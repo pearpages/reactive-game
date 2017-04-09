@@ -8,26 +8,55 @@
     var MAX_STAR_SIZE = 3;
     var HERO_Y = 30;
     var HERO_COLOR = '#ff0000';
+    var ENEMY_FREQ = 1500;
+    var ENEMIES_COLOR = '#00ff00';
 
-    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR);
+    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ,ENEMIES_COLOR);
 
-    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR) {
+    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ,ENEMIES_COLOR) {
         var canvas = document.createElement('canvas');
         var ctx = canvas.getContext("2d");
         attachCanvas(canvas, ctx);
         var StarStream = getStarStream(canvas, ctx, SPEED, STAR_NUMBER, MAX_STAR_SIZE)
-        var SpaceShip = getPlayerSpaceship(canvas.height - HERO_Y,canvas);
+        var SpaceShip = getPlayerSpaceship(canvas.height - HERO_Y, canvas);
+        var EnemiesStream = getEnemiesStream(ENEMY_FREQ, canvas);
 
         var Game = Rx.Observable.combineLatest(
-            StarStream, SpaceShip, function (stars, spaceship) {
-                return { stars: stars, spaceship: spaceship };
-            });
+            StarStream, SpaceShip, EnemiesStream, function (stars, spaceship, enemies) {
+                return { stars: stars, spaceship: spaceship, enemies: enemies };
+            })
+            .sample(SPEED);
         Game.subscribe(renderScene);
 
         function renderScene(actors) {
-            paintStars(actors.stars,canvas, ctx, SPACE_COLOR, STARS_COLOR);
+            paintStars(actors.stars, canvas, ctx, SPACE_COLOR, STARS_COLOR);
             paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
+            paintEnemies(actors.enemies,ctx,ENEMIES_COLOR);
         }
+    }
+
+    function getEnemiesStream(ENEMY_FREQ, canvas) {
+        return Rx.Observable.interval(ENEMY_FREQ)
+            .scan(function (enemyArray) {
+                var enemy = {
+                    x: parseInt(Math.random() * canvas.width),
+                    y: -30,
+                };
+                enemyArray.push(enemy);
+                return enemyArray;
+            }, []);
+    }
+
+    function paintEnemies(enemies,ctx, ENEMIES_COLOR) {
+        enemies.forEach(function (enemy) {
+            enemy.y += 5;
+            enemy.x += getRandomInt(-15, 15);
+            drawTriangle(ctx, enemy.x, enemy.y, 20, ENEMIES_COLOR, 'down');
+        });
+    }
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
     function attachCanvas(canvas, ctx) {
@@ -82,7 +111,7 @@
         ctx.fill();
     }
 
-    function getPlayerSpaceship(HERO_Y,canvas) {
+    function getPlayerSpaceship(HERO_Y, canvas) {
         var mouseMove = Rx.Observable.fromEvent(canvas, 'mousemove');
         var observable = mouseMove
             .map(function (event) {
