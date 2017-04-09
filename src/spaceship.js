@@ -1,16 +1,17 @@
 'use strict';
 
 (function () {
-    var SPEED = 10;
+    var SPEED = 40;
     var STAR_NUMBER = 250;
     var SPACE_COLOR = '#000000';
     var STARS_COLOR = '#ffffff';
     var MAX_STAR_SIZE = 3;
-    var HERO_Y =  30;
+    var HERO_Y = 30;
+    var HERO_COLOR = '#ff0000';
 
-    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y);
+    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR);
 
-    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y) {
+    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR) {
         var canvas = document.createElement('canvas');
         var ctx = canvas.getContext("2d");
         attachCanvas(canvas, ctx);
@@ -25,7 +26,7 @@
 
         function renderScene(actors) {
             paintStars(actors.stars,canvas, ctx, SPACE_COLOR, STARS_COLOR);
-            paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y);
+            paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
         }
     }
 
@@ -68,8 +69,8 @@
         });
     }
 
-    function paintSpaceShip(ctx, x, y) {
-        drawTriangle(ctx, x, y, 20, '#ff0000', 'up');
+    function paintSpaceShip(ctx, x, y, HERO_COLOR) {
+        drawTriangle(ctx, x, y, 20, HERO_COLOR, 'up');
     }
 
     function drawTriangle(ctx, x, y, width, color, direction) {
