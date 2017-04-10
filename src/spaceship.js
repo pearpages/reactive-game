@@ -48,13 +48,21 @@
         function renderScene(actors) {
             paintStars(actors.stars, canvas, ctx, SPACE_COLOR, STARS_COLOR);
             paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
-            paintEnemies(actors.enemies, ctx, ENEMIES_COLOR,ENEMIES_SHOOT_COLOR, ENEMY_SHOOTING_SPEED);
-            paintHeroShots(actors.heroShots, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR);
+            paintEnemies(actors.enemies, ctx, ENEMIES_COLOR, ENEMIES_SHOOT_COLOR, ENEMY_SHOOTING_SPEED);
+            paintHeroShots(actors.heroShots, actors.enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR);
         }
     }
 
-    function paintHeroShots(heroShots, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR) {
-        heroShots.forEach(function (shot) {
+    function paintHeroShots(heroShots, enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR) {
+        heroShots.forEach(function (shot, i) {
+            for (var l = 0; l < enemies.length; l++) {
+                var enemy = enemies[l];
+                if (!enemy.isDead && collision(shot, enemy)) {
+                    enemy.isDead = true;
+                    shot.x = shot.y = -100;
+                    break;
+                }
+            }
             shot.y -= HERO_SHOOTING_SPEED;
             drawTriangle(ctx, shot.x, shot.y, 5, SHOOT_COLOR, 'up');
         });
@@ -77,6 +85,12 @@
             }, []);
     }
 
+    function collision(target1, target2) {
+        return (target1.x > target2.x - 20 && target1.x < target2.x + 20) &&
+            (target1.y > target2.y - 20 && target1.y < target2.y + 20);
+    }
+
+
     function getPlayerFiringStream(PLAYER_FIRING_SPEED, canvas) {
         return Rx.Observable.fromEvent(canvas, 'click')
             .sample(PLAYER_FIRING_SPEED)
@@ -95,12 +109,18 @@
 
                 Rx.Observable.interval(ENEMY_SHOOTING_FREQ)
                     .subscribe(function () {
-                        enemy.shots.push({ x: enemy.x, y: enemy.y, canvas: canvas });
+                        if (!enemy.isDead) {
+                            enemy.shots.push({ x: enemy.x, y: enemy.y, canvas: canvas });
+                        }
                         enemy.shots = enemy.shots.filter(isVisible);
                     });
 
                 enemyArray.push(enemy);
-                return enemyArray.filter(isVisible);
+                return enemyArray
+                    .filter(isVisible)
+                    .filter(function (enemy) {
+                        return !(enemy.isDead && enemy.shots.length === 0);
+                    })
             }, []);
     }
 
@@ -113,7 +133,10 @@
         enemies.forEach(function (enemy) {
             enemy.y += 5;
             enemy.x += getRandomInt(-15, 15);
-            drawTriangle(ctx, enemy.x, enemy.y, 20, ENEMIES_COLOR, 'down');
+
+            if (!enemy.isDead) {
+                drawTriangle(ctx, enemy.x, enemy.y, 20, ENEMIES_COLOR, 'down');
+            }
 
             enemy.shots.forEach(function (shot) {
                 shot.y += ENEMY_SHOOTING_SPEED;
