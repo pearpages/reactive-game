@@ -16,10 +16,12 @@
     var HERO_SHOOTING_SPEED = 15;
     var SHOOT_COLOR = '#ffff00';
     var ENEMIES_SHOOT_COLOR = '#FF00BF';
+    var SCORE_COLOR = '#ffffff';
+    var SCORE_INCREASE = 10;
 
-    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED, SHOOT_COLOR, ENEMY_SHOOTING_FREQ);
+    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED, SHOOT_COLOR, ENEMY_SHOOTING_FREQ, SCORE_COLOR,SCORE_INCREASE);
 
-    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED, SHOOT_COLOR, ENEMY_SHOOTING_FREQ) {
+    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED, SHOOT_COLOR, ENEMY_SHOOTING_FREQ, SCORE_COLOR,SCORE_INCREASE) {
         var canvas = document.createElement('canvas');
         var ctx = canvas.getContext("2d");
         attachCanvas(canvas, ctx);
@@ -28,22 +30,26 @@
         var EnemiesStream = getEnemiesStream(ENEMY_FREQ, ENEMY_SHOOTING_FREQ, canvas);
         var PlayerFiringStream = getPlayerFiringStream(PLAYER_FIRING_SPEED, canvas);
         var HeroShotsStream = getHeroShots(PlayerFiringStream, SpaceShipStream, canvas.height - HERO_Y);
+        var ScoreSubject = new Rx.Subject();
+        var score = getScore(ScoreSubject);
 
         var Game = Rx.Observable.combineLatest(
             StarStream,
             SpaceShipStream,
             EnemiesStream,
             HeroShotsStream,
-            function (stars, spaceship, enemies, heroShots) {
+            score,
+            function (stars, spaceship, enemies, heroShots, score) {
                 return {
                     stars: stars,
                     spaceship: spaceship,
                     enemies: enemies,
-                    heroShots: heroShots
+                    heroShots: heroShots,
+                    score: score
                 };
             })
             .sample(SPEED)
-            .takeWhile(function(actors) {
+            .takeWhile(function (actors) {
                 return gameOver(actors.spaceship, actors.enemies) === false;
             });
         Game.subscribe(renderScene);
@@ -52,15 +58,29 @@
             paintStars(actors.stars, canvas, ctx, SPACE_COLOR, STARS_COLOR);
             paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
             paintEnemies(actors.enemies, ctx, ENEMIES_COLOR, ENEMIES_SHOOT_COLOR, ENEMY_SHOOTING_SPEED);
-            paintHeroShots(actors.heroShots, actors.enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR);
+            paintHeroShots(actors.heroShots, actors.enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR, ScoreSubject,SCORE_INCREASE);
+            paintScore(ctx, actors.score, SCORE_COLOR);
         }
     }
 
-    function paintHeroShots(heroShots, enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR) {
+    function getScore(ScoreSubject) {
+        return ScoreSubject.scan(function (prev, cur) {
+            return prev + cur;
+        }, 0).startWith(0);
+    }
+
+    function paintScore(ctx, score, SCORE_COLOR) {
+        ctx.fillStyle = SCORE_COLOR;
+        ctx.font = 'bold 26px sans-serif';
+        ctx.fillText('Score: ' + score, 40, 43);
+    }
+
+    function paintHeroShots(heroShots, enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR, ScoreSubject,SCORE_INCREASE) {
         heroShots.forEach(function (shot, i) {
             for (var l = 0; l < enemies.length; l++) {
                 var enemy = enemies[l];
                 if (!enemy.isDead && collision(shot, enemy)) {
+                    ScoreSubject.onNext(SCORE_INCREASE)
                     enemy.isDead = true;
                     shot.x = shot.y = -100;
                     break;
@@ -71,14 +91,14 @@
         });
     }
 
-    function gameOver(ship,enemies) {
-        return enemies.some(function(enemy){
-            if(collision(ship,enemy)) {
+    function gameOver(ship, enemies) {
+        return enemies.some(function (enemy) {
+            if (collision(ship, enemy)) {
                 return true;
             }
 
-            return enemy.shots.some(function(shot) {
-                return collision(ship,shot);
+            return enemy.shots.some(function (shot) {
+                return collision(ship, shot);
             });
         });
     }
@@ -109,7 +129,8 @@
     function getPlayerFiringStream(PLAYER_FIRING_SPEED, canvas) {
         return Rx.Observable.fromEvent(canvas, 'click')
             .sample(PLAYER_FIRING_SPEED)
-            .timestamp();
+            .timestamp()
+            .startWith({ timestamp: null });
     }
 
     function getEnemiesStream(ENEMY_FREQ, ENEMY_SHOOTING_FREQ, canvas) {
