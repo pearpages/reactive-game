@@ -42,7 +42,10 @@
                     heroShots: heroShots
                 };
             })
-            .sample(SPEED);
+            .sample(SPEED)
+            .takeWhile(function(actors) {
+                return gameOver(actors.spaceship, actors.enemies) === false;
+            });
         Game.subscribe(renderScene);
 
         function renderScene(actors) {
@@ -65,6 +68,18 @@
             }
             shot.y -= HERO_SHOOTING_SPEED;
             drawTriangle(ctx, shot.x, shot.y, 5, SHOOT_COLOR, 'up');
+        });
+    }
+
+    function gameOver(ship,enemies) {
+        return enemies.some(function(enemy){
+            if(collision(ship,enemy)) {
+                return true;
+            }
+
+            return enemy.shots.some(function(shot) {
+                return collision(ship,shot);
+            });
         });
     }
 
