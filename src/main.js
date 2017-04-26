@@ -1,37 +1,66 @@
 'use strict';
 
-(function () {
-    var SPEED = 40;
-    var STAR_NUMBER = 250;
-    var SPACE_COLOR = '#000000';
-    var STARS_COLOR = '#ffffff';
-    var MAX_STAR_SIZE = 3;
-    var HERO_Y = 30;
-    var HERO_COLOR = '#ff0000';
-    var ENEMY_FREQ = 1500;
-    var ENEMY_SHOOTING_FREQ = 750;
-    var ENEMY_SHOOTING_SPEED = 15;
-    var ENEMIES_COLOR = '#00ff00';
-    var PLAYER_FIRING_SPEED = 200;
-    var HERO_SHOOTING_SPEED = 15;
-    var SHOOT_COLOR = '#ffff00';
-    var ENEMIES_SHOOT_COLOR = '#FF00BF';
-    var SCORE_COLOR = '#ffffff';
-    var SCORE_INCREASE = 10;
+var game = new MyGame({
+    SPEED: 40,
+    STAR_NUMBER: 250,
+    SPACE_COLOR: '#000000',
+    STARS_COLOR: '#ffffff',
+    MAX_STAR_SIZE: 3,
+    HERO_Y: 30,
+    HERO_COLOR: '#ff0000',
+    ENEMY_FREQ: 1500,
+    ENEMY_SHOOTING_FREQ: 750,
+    ENEMY_SHOOTING_SPEED: 15,
+    ENEMIES_COLOR: '#00ff00',
+    PLAYER_FIRING_SPEED: 200,
+    HERO_SHOOTING_SPEED: 15,
+    SHOOT_COLOR: '#ffff00',
+    ENEMIES_SHOOT_COLOR: '#FF00BF',
+    SCORE_COLOR: '#ffffff',
+    SCORE_INCREASE: 10
+},
+    MyUtils(Rx) // Rx is loaded Globally in the index.html
+).init();
 
-    init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED, SHOOT_COLOR, ENEMY_SHOOTING_FREQ, SCORE_COLOR,SCORE_INCREASE);
+function MyGame(options, myUtils) {
 
-    function init(SPEED, STAR_NUMBER, SPACE_COLOR, STARS_COLOR, MAX_STAR_SIZE, HERO_Y, HERO_COLOR, ENEMY_FREQ, ENEMIES_COLOR, PLAYER_FIRING_SPEED, HERO_SHOOTING_SPEED, SHOOT_COLOR, ENEMY_SHOOTING_FREQ, SCORE_COLOR,SCORE_INCREASE) {
+    return {
+        init: init
+    };
+
+    function init() {
+        var SPEED = options.SPEED;
+        var STAR_NUMBER = options.STAR_NUMBER;
+        var SPACE_COLOR = options.SPACE_COLOR;
+        var STARS_COLOR = options.STARS_COLOR;
+        var MAX_STAR_SIZE = options.MAX_STAR_SIZE;
+        var HERO_Y = options.HERO_Y;
+        var HERO_COLOR = options.HERO_COLOR;
+        var ENEMY_FREQ = options.ENEMY_FREQ;
+        var ENEMY_SHOOTING_FREQ = options.ENEMY_SHOOTING_FREQ;
+        var ENEMY_SHOOTING_SPEED = options.ENEMY_SHOOTING_SPEED;
+        var ENEMIES_COLOR = options.ENEMIES_COLOR;
+        var PLAYER_FIRING_SPEED = options.PLAYER_FIRING_SPEED;
+        var HERO_SHOOTING_SPEED = options.HERO_SHOOTING_SPEED;
+        var SHOOT_COLOR = options.SHOOT_COLOR;
+        var ENEMIES_SHOOT_COLOR = options.ENEMIES_SHOOT_COLOR;
+        var SCORE_COLOR = options.SCORE_COLOR;
+        var SCORE_INCREASE = options.SCORE_INCREASE;
+
         var canvas = document.createElement('canvas');
         var ctx = canvas.getContext("2d");
-        attachCanvas(canvas, ctx);
-        var StarStream = getStarStream(canvas, ctx, SPEED, STAR_NUMBER, MAX_STAR_SIZE);
-        var SpaceShipStream = getPlayerSpaceship(canvas.height - HERO_Y, canvas);
-        var EnemiesStream = getEnemiesStream(ENEMY_FREQ, ENEMY_SHOOTING_FREQ, canvas);
-        var PlayerFiringStream = getPlayerFiringStream(PLAYER_FIRING_SPEED, canvas);
-        var HeroShotsStream = getHeroShots(PlayerFiringStream, SpaceShipStream, canvas.height - HERO_Y);
+        // attach canvas
+        document.body.appendChild(canvas);
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        var StarStream = myUtils.getStarStream(canvas, ctx, SPEED, STAR_NUMBER, MAX_STAR_SIZE);
+        var SpaceShipStream = myUtils.getPlayerSpaceship(canvas.height - HERO_Y, canvas);
+        var EnemiesStream = myUtils.getEnemiesStream(ENEMY_FREQ, ENEMY_SHOOTING_FREQ, canvas);
+        var PlayerFiringStream = myUtils.getPlayerFiringStream(PLAYER_FIRING_SPEED, canvas);
+        var HeroShotsStream = myUtils.getHeroShots(PlayerFiringStream, SpaceShipStream, canvas.height - HERO_Y);
         var ScoreSubject = new Rx.Subject();
-        var score = getScore(ScoreSubject);
+        var score = myUtils.getScore(ScoreSubject);
 
         var Game = Rx.Observable.combineLatest(
             StarStream,
@@ -50,18 +79,41 @@
             })
             .sample(SPEED)
             .takeWhile(function (actors) {
-                return gameOver(actors.spaceship, actors.enemies) === false;
+                return myUtils.gameOver(actors.spaceship, actors.enemies) === false;
             });
         Game.subscribe(renderScene);
 
         function renderScene(actors) {
-            paintStars(actors.stars, canvas, ctx, SPACE_COLOR, STARS_COLOR);
-            paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
-            paintEnemies(actors.enemies, ctx, ENEMIES_COLOR, ENEMIES_SHOOT_COLOR, ENEMY_SHOOTING_SPEED);
-            paintHeroShots(actors.heroShots, actors.enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR, ScoreSubject,SCORE_INCREASE);
-            paintScore(ctx, actors.score, SCORE_COLOR);
+            myUtils.paintStars(actors.stars, canvas, ctx, SPACE_COLOR, STARS_COLOR);
+            myUtils.paintSpaceShip(ctx, actors.spaceship.x, actors.spaceship.y, HERO_COLOR);
+            myUtils.paintEnemies(actors.enemies, ctx, ENEMIES_COLOR, ENEMIES_SHOOT_COLOR, ENEMY_SHOOTING_SPEED);
+            myUtils.paintHeroShots(actors.heroShots, actors.enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR, ScoreSubject, SCORE_INCREASE);
+            myUtils.paintScore(ctx, actors.score, SCORE_COLOR);
         }
     }
+
+}
+
+function MyUtils(Rx) {
+
+    return {
+        getScore: getScore,
+        paintScore: paintScore,
+        paintHeroShots: paintHeroShots,
+        gameOver: gameOver,
+        getHeroShots: getHeroShots,
+        collision: collision,
+        getPlayerFiringStream: getPlayerFiringStream,
+        getEnemiesStream: getEnemiesStream,
+        isVisible: isVisible,
+        paintEnemies: paintEnemies,
+        getRandomInt: getRandomInt,
+        getStarStream: getStarStream,
+        paintStars: paintStars,
+        paintSpaceShip: paintSpaceShip,
+        drawTriangle: drawTriangle,
+        getPlayerSpaceship: getPlayerSpaceship
+    };
 
     function getScore(ScoreSubject) {
         return ScoreSubject.scan(function (prev, cur) {
@@ -75,7 +127,7 @@
         ctx.fillText('Score: ' + score, 40, 43);
     }
 
-    function paintHeroShots(heroShots, enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR, ScoreSubject,SCORE_INCREASE) {
+    function paintHeroShots(heroShots, enemies, ctx, HERO_SHOOTING_SPEED, SHOOT_COLOR, ScoreSubject, SCORE_INCREASE) {
         heroShots.forEach(function (shot, i) {
             for (var l = 0; l < enemies.length; l++) {
                 var enemy = enemies[l];
@@ -124,7 +176,6 @@
         return (target1.x > target2.x - 20 && target1.x < target2.x + 20) &&
             (target1.y > target2.y - 20 && target1.y < target2.y + 20);
     }
-
 
     function getPlayerFiringStream(PLAYER_FIRING_SPEED, canvas) {
         return Rx.Observable.fromEvent(canvas, 'click')
@@ -183,12 +234,6 @@
 
     function getRandomInt(min, max) {
         return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-
-    function attachCanvas(canvas, ctx) {
-        document.body.appendChild(canvas);
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
     }
 
     function getStarStream(canvas, ctx, SPEED, STAR_NUMBER, MAX_STAR_SIZE) {
@@ -251,8 +296,7 @@
             });
         return mouseMove;
     }
-
-})();
+}
 
 
 
